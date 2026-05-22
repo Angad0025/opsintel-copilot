@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Environment files
+.env
+.env.local
+
+# Terraform
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+crash.log
+
+# Mac
+.DS_Store
+
+# IDE
+.vscode/
+
+# Generated data
+*.csv
+*.json
+*.parquet
+sample_data/generated/
