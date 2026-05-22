@@ -12,7 +12,6 @@ venv/
 *.tfstate
 *.tfstate.*
 .terraform/
-.terraform.lock.hcl
 crash.log
 
 # Mac
