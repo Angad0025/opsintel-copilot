@@ -27,11 +27,17 @@ Raw data lands in Amazon S3. Databricks on AWS processes the data into Delta Lak
 ## Current Week 1 Progress
 
 - Initialized Git repository
+- Created GitHub repository
 - Created project folder structure
-- Added Terraform foundation folders
-- Added documentation folders
-- Added service folders for generators, API, and dashboard
-- Added Databricks folders for notebooks, jobs, and SQL
+- Added Terraform foundation
+- Installed AWS CLI and Terraform
+- Configured AWS CLI with IAM user access
+- Created S3 data lake bucket using Terraform
+- Added S3 prefixes for raw, bronze, silver, gold, rag-docs, and checkpoints
+- Verified S3 bucket through AWS Console and AWS CLI
+- Added AWS setup documentation
+- Added architecture documentation
+- Added architecture diagram draft
 
 ## Tech Stack
 

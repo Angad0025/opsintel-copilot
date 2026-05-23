@@ -1,0 +1,25 @@
+flowchart TD
+    GitHub[GitHub Repo] --> Terraform[Terraform IaC]
+
+    Terraform --> S3[S3 Data Lake]
+    Terraform --> IAM[IAM User and Policies]
+
+    Generators[Synthetic Data Generators] --> Raw[S3 raw/]
+
+    Raw --> DBX[Databricks on AWS]
+
+    DBX --> Bronze[S3 bronze/]
+    Bronze --> Silver[S3 silver/]
+    Silver --> Gold[S3 gold/]
+
+    Gold --> RDS[(Amazon RDS PostgreSQL)]
+    Gold --> RagDocs[S3 rag-docs/]
+
+    RagDocs --> Bedrock[Amazon Bedrock Knowledge Base]
+
+    RDS --> API[FastAPI Backend]
+    Bedrock --> API
+
+    API --> Dashboard[Streamlit Dashboard]
+
+    DBX --> Checkpoints[S3 checkpoints/]
