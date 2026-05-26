@@ -20,8 +20,7 @@ crash.log
 # IDE
 .vscode/
 
-# Generated data
-*.csv
-*.json
-*.parquet
-sample_data/generated/
+# Generated synthetic data
+sample_data/**/*.csv
+sample_data/**/*.json
+sample_data/**/*.parquet
