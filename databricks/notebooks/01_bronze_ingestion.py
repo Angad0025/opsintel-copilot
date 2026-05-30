@@ -7,15 +7,15 @@
 # Read raw CSV datasets from AWS S3 and convert them into
 # Delta Lake bronze tables with ingestion metadata.
 #
-# Datasets:
-# - orders
-# - security_logs
-# - admin_events
+# Inputs:
+# - s3://opsintel-copilot-angad-0025/raw/orders/
+# - s3://opsintel-copilot-angad-0025/raw/security_logs/
+# - s3://opsintel-copilot-angad-0025/raw/admin_events/
 #
-# Output:
-# - bronze_orders
-# - bronze_security_logs
-# - bronze_admin_events
+# Outputs:
+# - workspace.opsintel_copilot.bronze_orders
+# - workspace.opsintel_copilot.bronze_security_logs
+# - workspace.opsintel_copilot.bronze_admin_events
 # ============================================================
 
 from pyspark.sql import functions as F
@@ -31,7 +31,17 @@ BASE_PATH = f"s3://{S3_BUCKET}"
 RAW_BASE_PATH = f"{BASE_PATH}/raw"
 BRONZE_BASE_PATH = f"{BASE_PATH}/bronze"
 
-DATABASE_NAME = "opsintel_copilot"
+CATALOG_NAME = "workspace"
+SCHEMA_NAME = "opsintel_copilot"
+
+
+# ------------------------------------------------------------
+# Use Unity Catalog catalog and schema
+# ------------------------------------------------------------
+
+spark.sql(f"USE CATALOG {CATALOG_NAME}")
+spark.sql(f"CREATE SCHEMA IF NOT EXISTS {SCHEMA_NAME}")
+spark.sql(f"USE SCHEMA {SCHEMA_NAME}")
 
 
 # ------------------------------------------------------------
@@ -58,31 +68,24 @@ DATASETS = {
 
 
 # ------------------------------------------------------------
-# Create database
-# ------------------------------------------------------------
-
-spark.sql(f"CREATE DATABASE IF NOT EXISTS {DATABASE_NAME}")
-spark.sql(f"USE {DATABASE_NAME}")
-
-
-# ------------------------------------------------------------
-# Helper function: read raw CSV and write bronze Delta table
+# Helper function
 # ------------------------------------------------------------
 
 def ingest_to_bronze(dataset_name: str, config: dict) -> None:
     """
     Reads raw CSV data from S3, adds bronze ingestion metadata,
-    writes it as Delta format, and registers it as a Databricks table.
+    writes it as Delta format, and registers it as a Unity Catalog table.
     """
 
     raw_path = config["raw_path"]
     bronze_path = config["bronze_path"]
     table_name = config["table_name"]
+    full_table_name = f"{CATALOG_NAME}.{SCHEMA_NAME}.{table_name}"
 
     print(f"Starting bronze ingestion for dataset: {dataset_name}")
     print(f"Raw path: {raw_path}")
     print(f"Bronze path: {bronze_path}")
-    print(f"Table name: {DATABASE_NAME}.{table_name}")
+    print(f"Table name: {full_table_name}")
 
     raw_df = (
         spark.read
@@ -97,7 +100,7 @@ def ingest_to_bronze(dataset_name: str, config: dict) -> None:
         .withColumn("_dataset_name", F.lit(dataset_name))
         .withColumn("_ingestion_timestamp", F.current_timestamp())
         .withColumn("_bronze_load_date", F.current_date())
-        .withColumn("_source_file", F.input_file_name())
+        .withColumn("_source_file", F.col("_metadata.file_path"))
     )
 
     (
@@ -108,21 +111,23 @@ def ingest_to_bronze(dataset_name: str, config: dict) -> None:
         .save(bronze_path)
     )
 
+    spark.sql(f"DROP TABLE IF EXISTS {full_table_name}")
+
     spark.sql(f"""
-        CREATE TABLE IF NOT EXISTS {DATABASE_NAME}.{table_name}
+        CREATE TABLE {full_table_name}
         USING DELTA
         LOCATION '{bronze_path}'
     """)
 
-    row_count = spark.table(f"{DATABASE_NAME}.{table_name}").count()
+    row_count = spark.table(full_table_name).count()
 
     print(f"Completed bronze ingestion for dataset: {dataset_name}")
-    print(f"Rows written to {DATABASE_NAME}.{table_name}: {row_count}")
+    print(f"Rows written to {full_table_name}: {row_count}")
     print("-" * 80)
 
 
 # ------------------------------------------------------------
-# Run bronze ingestion for all configured datasets
+# Run bronze ingestion
 # ------------------------------------------------------------
 
 for dataset_name, config in DATASETS.items():
@@ -130,16 +135,17 @@ for dataset_name, config in DATASETS.items():
 
 
 # ------------------------------------------------------------
-# Bronze validation summary
+# Validation summary
 # ------------------------------------------------------------
 
 summary_rows = []
 
 for dataset_name, config in DATASETS.items():
     table_name = config["table_name"]
-    count_value = spark.table(f"{DATABASE_NAME}.{table_name}").count()
+    full_table_name = f"{CATALOG_NAME}.{SCHEMA_NAME}.{table_name}"
+    count_value = spark.table(full_table_name).count()
 
-    summary_rows.append((dataset_name, table_name, count_value))
+    summary_rows.append((dataset_name, full_table_name, count_value))
 
 summary_df = spark.createDataFrame(
     summary_rows,

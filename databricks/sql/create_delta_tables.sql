@@ -6,13 +6,15 @@
 -- Validate bronze and silver Delta tables created by Databricks
 -- PySpark notebooks.
 --
--- Database:
+-- Catalog:
+-- workspace
+--
+-- Schema:
 -- opsintel_copilot
 -- ============================================================
 
-CREATE DATABASE IF NOT EXISTS opsintel_copilot;
-
-USE opsintel_copilot;
+USE CATALOG workspace;
+USE SCHEMA opsintel_copilot;
 
 
 -- ============================================================
@@ -104,40 +106,6 @@ ORDER BY dataset_name, rule_failed;
 
 
 -- ============================================================
--- Sample bronze records
--- ============================================================
-
-SELECT *
-FROM bronze_orders
-LIMIT 10;
-
-SELECT *
-FROM bronze_security_logs
-LIMIT 10;
-
-SELECT *
-FROM bronze_admin_events
-LIMIT 10;
-
-
--- ============================================================
--- Sample silver records
--- ============================================================
-
-SELECT *
-FROM silver_orders
-LIMIT 10;
-
-SELECT *
-FROM silver_security_logs
-LIMIT 10;
-
-SELECT *
-FROM silver_admin_events
-LIMIT 10;
-
-
--- ============================================================
 -- Ingestion metadata check
 -- ============================================================
 
@@ -171,3 +139,20 @@ SELECT
     COUNT(DISTINCT _source_file) AS source_file_count
 FROM bronze_admin_events
 GROUP BY _dataset_name;
+
+
+-- ============================================================
+-- Sample silver records
+-- ============================================================
+
+SELECT *
+FROM silver_orders
+LIMIT 10;
+
+SELECT *
+FROM silver_security_logs
+LIMIT 10;
+
+SELECT *
+FROM silver_admin_events
+LIMIT 10;
