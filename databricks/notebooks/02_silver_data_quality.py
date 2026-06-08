@@ -1,22 +1,25 @@
 # Databricks notebook source
+# Databricks notebook source
 # ============================================================
 # OpsIntel Copilot
 # Week 3 — Silver Data Quality Pipeline
 #
 # Purpose:
 # Read bronze Delta tables, apply data quality checks,
-# remove duplicates, validate timestamps, track bad records,
+# remove duplicates, validate timestamps, separate bad records,
 # and write cleaned data into silver Delta tables.
 #
 # Inputs:
 # - workspace.opsintel_copilot.bronze_orders
 # - workspace.opsintel_copilot.bronze_security_logs
 # - workspace.opsintel_copilot.bronze_admin_events
+# - workspace.opsintel_copilot.bronze_pipeline_logs
 #
 # Outputs:
 # - workspace.opsintel_copilot.silver_orders
 # - workspace.opsintel_copilot.silver_security_logs
 # - workspace.opsintel_copilot.silver_admin_events
+# - workspace.opsintel_copilot.silver_pipeline_logs
 # - workspace.opsintel_copilot.bad_records_summary
 # ============================================================
 
@@ -131,21 +134,46 @@ def process_orders(summary_rows):
 
     timestamp_col = find_timestamp_column(
         df,
-        ["created_at", "order_timestamp", "event_timestamp", "timestamp", "order_time"],
+        [
+            "created_at",
+            "order_timestamp",
+            "event_timestamp",
+            "timestamp",
+            "order_time",
+        ],
     )
 
     if timestamp_col:
         df = df.withColumn(timestamp_col, F.to_timestamp(F.col(timestamp_col)))
         invalid_timestamp_count = df.filter(F.col(timestamp_col).isNull()).count()
-        add_bad_record_summary(summary_rows, dataset_name, "invalid_or_missing_timestamp", invalid_timestamp_count)
+        add_bad_record_summary(
+            summary_rows,
+            dataset_name,
+            "invalid_or_missing_timestamp",
+            invalid_timestamp_count,
+        )
     else:
-        add_bad_record_summary(summary_rows, dataset_name, "missing_timestamp_column", original_count)
+        add_bad_record_summary(
+            summary_rows,
+            dataset_name,
+            "missing_timestamp_column",
+            original_count,
+        )
 
-    required_columns = [col for col in ["order_id", "customer_id"] if col in df.columns]
+    required_columns = []
+
+    for candidate in ["order_id", "customer_id"]:
+        if candidate in df.columns:
+            required_columns.append(candidate)
 
     for required_col in required_columns:
         bad_count = df.filter(F.col(required_col).isNull()).count()
-        add_bad_record_summary(summary_rows, dataset_name, f"missing_{required_col}", bad_count)
+        add_bad_record_summary(
+            summary_rows,
+            dataset_name,
+            f"missing_{required_col}",
+            bad_count,
+        )
 
     for required_col in required_columns:
         df = df.filter(F.col(required_col).isNotNull())
@@ -156,13 +184,20 @@ def process_orders(summary_rows):
     if "order_id" in df.columns:
         before_dedup = df.count()
         df = df.dropDuplicates(["order_id"])
-        duplicate_count = before_dedup - df.count()
+        after_dedup = df.count()
+        duplicate_count = before_dedup - after_dedup
     else:
         before_dedup = df.count()
         df = df.dropDuplicates()
-        duplicate_count = before_dedup - df.count()
+        after_dedup = df.count()
+        duplicate_count = before_dedup - after_dedup
 
-    add_bad_record_summary(summary_rows, dataset_name, "duplicate_records_removed", duplicate_count)
+    add_bad_record_summary(
+        summary_rows,
+        dataset_name,
+        "duplicate_records_removed",
+        duplicate_count,
+    )
 
     if "order_status" in df.columns:
         df = df.withColumn("order_status", F.lower(F.trim(F.col("order_status"))))
@@ -209,21 +244,46 @@ def process_security_logs(summary_rows):
 
     timestamp_col = find_timestamp_column(
         df,
-        ["event_time", "event_timestamp", "timestamp", "login_timestamp", "created_at"],
+        [
+            "event_time",
+            "event_timestamp",
+            "timestamp",
+            "login_timestamp",
+            "created_at",
+        ],
     )
 
     if timestamp_col:
         df = df.withColumn(timestamp_col, F.to_timestamp(F.col(timestamp_col)))
         invalid_timestamp_count = df.filter(F.col(timestamp_col).isNull()).count()
-        add_bad_record_summary(summary_rows, dataset_name, "invalid_or_missing_timestamp", invalid_timestamp_count)
+        add_bad_record_summary(
+            summary_rows,
+            dataset_name,
+            "invalid_or_missing_timestamp",
+            invalid_timestamp_count,
+        )
     else:
-        add_bad_record_summary(summary_rows, dataset_name, "missing_timestamp_column", original_count)
+        add_bad_record_summary(
+            summary_rows,
+            dataset_name,
+            "missing_timestamp_column",
+            original_count,
+        )
 
-    required_columns = [col for col in ["event_id", "user_id", "user_email", "source_ip"] if col in df.columns]
+    required_columns = []
+
+    for candidate in ["event_id", "user_id", "user_email", "source_ip"]:
+        if candidate in df.columns:
+            required_columns.append(candidate)
 
     for required_col in required_columns:
         bad_count = df.filter(F.col(required_col).isNull()).count()
-        add_bad_record_summary(summary_rows, dataset_name, f"missing_{required_col}", bad_count)
+        add_bad_record_summary(
+            summary_rows,
+            dataset_name,
+            f"missing_{required_col}",
+            bad_count,
+        )
 
     for required_col in required_columns:
         df = df.filter(F.col(required_col).isNotNull())
@@ -243,13 +303,20 @@ def process_security_logs(summary_rows):
     if "event_id" in df.columns:
         before_dedup = df.count()
         df = df.dropDuplicates(["event_id"])
-        duplicate_count = before_dedup - df.count()
+        after_dedup = df.count()
+        duplicate_count = before_dedup - after_dedup
     else:
         before_dedup = df.count()
         df = df.dropDuplicates()
-        duplicate_count = before_dedup - df.count()
+        after_dedup = df.count()
+        duplicate_count = before_dedup - after_dedup
 
-    add_bad_record_summary(summary_rows, dataset_name, "duplicate_records_removed", duplicate_count)
+    add_bad_record_summary(
+        summary_rows,
+        dataset_name,
+        "duplicate_records_removed",
+        duplicate_count,
+    )
 
     silver_df = (
         df
@@ -287,21 +354,46 @@ def process_admin_events(summary_rows):
 
     timestamp_col = find_timestamp_column(
         df,
-        ["event_time", "event_timestamp", "admin_event_timestamp", "timestamp", "created_at"],
+        [
+            "event_time",
+            "event_timestamp",
+            "admin_event_timestamp",
+            "timestamp",
+            "created_at",
+        ],
     )
 
     if timestamp_col:
         df = df.withColumn(timestamp_col, F.to_timestamp(F.col(timestamp_col)))
         invalid_timestamp_count = df.filter(F.col(timestamp_col).isNull()).count()
-        add_bad_record_summary(summary_rows, dataset_name, "invalid_or_missing_timestamp", invalid_timestamp_count)
+        add_bad_record_summary(
+            summary_rows,
+            dataset_name,
+            "invalid_or_missing_timestamp",
+            invalid_timestamp_count,
+        )
     else:
-        add_bad_record_summary(summary_rows, dataset_name, "missing_timestamp_column", original_count)
+        add_bad_record_summary(
+            summary_rows,
+            dataset_name,
+            "missing_timestamp_column",
+            original_count,
+        )
 
-    required_columns = [col for col in ["admin_event_id", "event_id", "admin_user", "action"] if col in df.columns]
+    required_columns = []
+
+    for candidate in ["admin_event_id", "event_id", "admin_user", "action"]:
+        if candidate in df.columns:
+            required_columns.append(candidate)
 
     for required_col in required_columns:
         bad_count = df.filter(F.col(required_col).isNull()).count()
-        add_bad_record_summary(summary_rows, dataset_name, f"missing_{required_col}", bad_count)
+        add_bad_record_summary(
+            summary_rows,
+            dataset_name,
+            f"missing_{required_col}",
+            bad_count,
+        )
 
     for required_col in required_columns:
         df = df.filter(F.col(required_col).isNotNull())
@@ -328,13 +420,20 @@ def process_admin_events(summary_rows):
     if dedup_key:
         before_dedup = df.count()
         df = df.dropDuplicates([dedup_key])
-        duplicate_count = before_dedup - df.count()
+        after_dedup = df.count()
+        duplicate_count = before_dedup - after_dedup
     else:
         before_dedup = df.count()
         df = df.dropDuplicates()
-        duplicate_count = before_dedup - df.count()
+        after_dedup = df.count()
+        duplicate_count = before_dedup - after_dedup
 
-    add_bad_record_summary(summary_rows, dataset_name, "duplicate_records_removed", duplicate_count)
+    add_bad_record_summary(
+        summary_rows,
+        dataset_name,
+        "duplicate_records_removed",
+        duplicate_count,
+    )
 
     silver_df = (
         df
@@ -353,6 +452,126 @@ def process_admin_events(summary_rows):
 
 
 # ------------------------------------------------------------
+# Silver processing: Pipeline Logs
+# ------------------------------------------------------------
+
+def process_pipeline_logs(summary_rows):
+    dataset_name = "pipeline_logs"
+    bronze_table = "bronze_pipeline_logs"
+    silver_table = "silver_pipeline_logs"
+    silver_path = f"{SILVER_BASE_PATH}/pipeline_logs/"
+
+    if not table_exists(bronze_table):
+        raise ValueError(f"Missing required table: {full_table_name(bronze_table)}")
+
+    df = spark.table(full_table_name(bronze_table))
+    df = clean_column_names(df)
+
+    original_count = df.count()
+
+    # Convert start_time to timestamp (primary event time)
+    if "start_time" in df.columns:
+        df = df.withColumn("start_time", F.to_timestamp(F.col("start_time")))
+        invalid_start_count = df.filter(F.col("start_time").isNull()).count()
+        add_bad_record_summary(
+            summary_rows,
+            dataset_name,
+            "invalid_or_missing_start_time",
+            invalid_start_count,
+        )
+    else:
+        add_bad_record_summary(
+            summary_rows,
+            dataset_name,
+            "missing_start_time_column",
+            original_count,
+        )
+
+    # Convert end_time to timestamp as well
+    if "end_time" in df.columns:
+        df = df.withColumn("end_time", F.to_timestamp(F.col("end_time")))
+
+    # Check required columns
+    required_columns = []
+
+    for candidate in ["run_id", "pipeline_name"]:
+        if candidate in df.columns:
+            required_columns.append(candidate)
+
+    for required_col in required_columns:
+        bad_count = df.filter(F.col(required_col).isNull()).count()
+        add_bad_record_summary(
+            summary_rows,
+            dataset_name,
+            f"missing_{required_col}",
+            bad_count,
+        )
+
+    for required_col in required_columns:
+        df = df.filter(F.col(required_col).isNotNull())
+
+    if "start_time" in df.columns:
+        df = df.filter(F.col("start_time").isNotNull())
+
+    # Deduplicate on run_id
+    if "run_id" in df.columns:
+        before_dedup = df.count()
+        df = df.dropDuplicates(["run_id"])
+        after_dedup = df.count()
+        duplicate_count = before_dedup - after_dedup
+    else:
+        before_dedup = df.count()
+        df = df.dropDuplicates()
+        after_dedup = df.count()
+        duplicate_count = before_dedup - after_dedup
+
+    add_bad_record_summary(
+        summary_rows,
+        dataset_name,
+        "duplicate_records_removed",
+        duplicate_count,
+    )
+
+    # Standardise string columns
+    if "status" in df.columns:
+        df = df.withColumn("status", F.lower(F.trim(F.col("status"))))
+
+    if "pipeline_name" in df.columns:
+        df = df.withColumn("pipeline_name", F.lower(F.trim(F.col("pipeline_name"))))
+
+    if "region" in df.columns:
+        df = df.withColumn("region", F.lower(F.trim(F.col("region"))))
+
+    if "trigger_type" in df.columns:
+        df = df.withColumn("trigger_type", F.lower(F.trim(F.col("trigger_type"))))
+
+    if "error_message" in df.columns:
+        df = df.withColumn("error_message", F.lower(F.trim(F.col("error_message"))))
+
+    # Cast numeric columns to correct types
+    if "duration_seconds" in df.columns:
+        df = df.withColumn("duration_seconds", F.col("duration_seconds").cast("integer"))
+
+    if "records_processed" in df.columns:
+        df = df.withColumn("records_processed", F.col("records_processed").cast("integer"))
+
+    silver_df = (
+        df
+        .withColumn("_silver_load_timestamp", F.current_timestamp())
+        .withColumn("_silver_load_date", F.current_date())
+    )
+
+    write_delta_table(silver_df, silver_table, silver_path)
+
+    final_count = spark.table(full_table_name(silver_table)).count()
+
+    print("Pipeline logs silver processing complete.")
+    print(f"Original bronze rows: {original_count}")
+    print(f"Final silver rows: {final_count}")
+    print("-" * 80)
+
+
+# ------------------------------------------------------------
 # Run all silver processing jobs
 # ------------------------------------------------------------
 
@@ -361,6 +580,7 @@ bad_record_summary_rows = []
 process_orders(bad_record_summary_rows)
 process_security_logs(bad_record_summary_rows)
 process_admin_events(bad_record_summary_rows)
+process_pipeline_logs(bad_record_summary_rows)
 
 
 # ------------------------------------------------------------
@@ -369,7 +589,11 @@ process_admin_events(bad_record_summary_rows)
 
 bad_records_summary_df = spark.createDataFrame(
     bad_record_summary_rows,
-    ["dataset_name", "rule_failed", "bad_record_count"],
+    [
+        "dataset_name",
+        "rule_failed",
+        "bad_record_count",
+    ],
 )
 
 bad_records_summary_df = (
@@ -411,11 +635,24 @@ final_summary_rows = [
         full_table_name("silver_admin_events"),
         spark.table(full_table_name("silver_admin_events")).count(),
     ),
+    (
+        "pipeline_logs",
+        full_table_name("bronze_pipeline_logs"),
+        spark.table(full_table_name("bronze_pipeline_logs")).count(),
+        full_table_name("silver_pipeline_logs"),
+        spark.table(full_table_name("silver_pipeline_logs")).count(),
+    ),
 ]
 
 final_summary_df = spark.createDataFrame(
     final_summary_rows,
-    ["dataset_name", "bronze_table", "bronze_count", "silver_table", "silver_count"],
+    [
+        "dataset_name",
+        "bronze_table",
+        "bronze_count",
+        "silver_table",
+        "silver_count",
+    ],
 )
 
 display(final_summary_df)

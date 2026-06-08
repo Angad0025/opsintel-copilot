@@ -1,4 +1,5 @@
 # Databricks notebook source
+# Databricks notebook source
 # ============================================================
 # OpsIntel Copilot
 # Week 3 — Bronze Ingestion Pipeline
@@ -11,11 +12,13 @@
 # - s3://opsintel-copilot-angad-0025/raw/orders/
 # - s3://opsintel-copilot-angad-0025/raw/security_logs/
 # - s3://opsintel-copilot-angad-0025/raw/admin_events/
+# - s3://opsintel-copilot-angad-0025/raw/pipeline_logs/
 #
 # Outputs:
 # - workspace.opsintel_copilot.bronze_orders
 # - workspace.opsintel_copilot.bronze_security_logs
 # - workspace.opsintel_copilot.bronze_admin_events
+# - workspace.opsintel_copilot.bronze_pipeline_logs
 # ============================================================
 
 from pyspark.sql import functions as F
@@ -63,6 +66,11 @@ DATASETS = {
         "raw_path": f"{RAW_BASE_PATH}/admin_events/",
         "bronze_path": f"{BRONZE_BASE_PATH}/admin_events/",
         "table_name": "bronze_admin_events",
+    },
+    "pipeline_logs": {
+        "raw_path": f"{RAW_BASE_PATH}/pipeline_logs/",
+        "bronze_path": f"{BRONZE_BASE_PATH}/pipeline_logs/",
+        "table_name": "bronze_pipeline_logs",
     },
 }
 
