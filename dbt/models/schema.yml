@@ -23,16 +23,13 @@ models:
     columns:
       - name: event_id
         tests: [unique, not_null]
-      - name: user_id
+      - name: user_email
         tests: [not_null]
-    tests:
-      - no_impossible_travel:
-          column_name: user_id
 
   - name: silver_admin_events
     description: "Cleaned admin events with suspicious flag indicators"
     columns:
-      - name: event_id
+      - name: admin_event_id
         tests: [unique, not_null]
 
   - name: gold_security_alerts

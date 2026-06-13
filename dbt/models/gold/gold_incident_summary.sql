@@ -1,6 +1,6 @@
 SELECT
     DATE_TRUNC('hour', event_time)                                     AS incident_hour,
-    severity,
+    region,
     COUNT(*)                                                           AS total_events,
     SUM(CASE WHEN is_brute_force       THEN 1 ELSE 0 END)             AS brute_force_count,
     SUM(CASE WHEN is_escalation        THEN 1 ELSE 0 END)             AS escalation_count,
@@ -8,4 +8,4 @@ SELECT
     SUM(CASE WHEN is_large_export      THEN 1 ELSE 0 END)             AS large_export_count,
     CURRENT_TIMESTAMP()                                                AS summary_generated_at
 FROM {{ ref('silver_security_logs') }}
-GROUP BY DATE_TRUNC('hour', event_time), severity
+GROUP BY DATE_TRUNC('hour', event_time), region
