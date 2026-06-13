@@ -1,0 +1,21 @@
+name: opsintel_copilot
+version: '1.0.0'
+config-version: 2
+profile: opsintel
+
+model-paths: ['models']
+snapshot-paths: ['snapshots']
+macro-paths: ['macros']
+test-paths: ['tests']
+
+models:
+  opsintel_copilot:
+    staging:
+      +materialized: view
+      +tags: ['staging']
+    silver:
+      +materialized: table
+      +tags: ['silver']
+    gold:
+      +materialized: table
+      +tags: ['gold']

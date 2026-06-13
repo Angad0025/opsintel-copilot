@@ -1,0 +1,51 @@
+version: 2
+models:
+  - name: silver_orders
+    description: "Cleaned and validated orders from bronze layer"
+    columns:
+      - name: order_id
+        tests: [unique, not_null]
+      - name: amount
+        tests: [not_null]
+      - name: currency
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['USD', 'EUR', 'GBP', 'INR']
+      - name: created_at
+        tests: [not_null]
+    tests:
+      - row_count_not_dropped:
+          threshold: 100
+
+  - name: silver_security_logs
+    description: "Cleaned security logs with suspicious event flags"
+    columns:
+      - name: event_id
+        tests: [unique, not_null]
+      - name: user_id
+        tests: [not_null]
+    tests:
+      - no_impossible_travel:
+          column_name: user_id
+
+  - name: silver_admin_events
+    description: "Cleaned admin events with suspicious flag indicators"
+    columns:
+      - name: event_id
+        tests: [unique, not_null]
+
+  - name: gold_security_alerts
+    description: "Gold layer — only flagged security events"
+    columns:
+      - name: event_id
+        tests: [not_null]
+
+  - name: gold_incident_summary
+    description: "Hourly incident summary by severity"
+
+  - name: gold_correlation_records
+    description: "Cross-domain correlations between security and admin events"
+    columns:
+      - name: confidence_score
+        tests: [not_null]
