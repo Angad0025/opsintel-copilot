@@ -54,10 +54,86 @@ REGIONS = [
 
 def generate_admin_events(num_records: int = DEFAULT_NUM_RECORDS):
     start_time = datetime(2026, 5, 1, 0, 0, 0)
+    rows = []
 
+    # ── Normal admin activity ─────────────────────────────────────
+    for i in range(1, num_records + 1):
+        action = random.choice(ACTIONS)
+        risk_level = random.choice(["low", "medium", "high"])
+
+        if action in [
+            "iam_policy_updated",
+            "s3_bucket_policy_updated",
+            "secret_rotated",
+            "permission_added"
+        ]:
+            risk_level = random.choice(["medium", "high", "critical"])
+
+        event_time = start_time + timedelta(
+            seconds=random.randint(0, 30 * 24 * 60 * 60)
+        )
+
+        rows.append([
+            f"ADM{i:09d}",
+            random.choice(ADMIN_USERS),
+            action,
+            random.choice(TARGET_SERVICES),
+            random.choice(REGIONS),
+            event_time.strftime("%Y-%m-%d %H:%M:%S"),
+            f"{action} performed on production service",
+            risk_level,
+            fake.ipv4_public()
+        ])
+
+    # ── Scenario 1: Config change right before pipeline failure ───
+    # Correlation engine will link this to the pipeline failure
+    failure_time = datetime(2026, 5, 22, 2, 7, 0)
+    for j in range(3):
+        rows.append([
+            f"CRITICAL{j:06d}",
+            "admin@datacorp.com",
+            "config_changed",
+            "orders-pipeline",
+            "us-east-1",
+            (failure_time + timedelta(minutes=j)).strftime("%Y-%m-%d %H:%M:%S"),
+            "critical config change performed on production orders pipeline",
+            "critical",
+            fake.ipv4_public()
+        ])
+
+    # ── Scenario 2: Privilege escalation ──────────────────────────
+    # Analyst suddenly gets admin access they shouldn't have
+    escalation_time = datetime(2026, 5, 22, 2, 5, 0)
+    rows.append([
+        "PRIV000001",
+        "analyst@datacorp.com",
+        "permission_added",
+        "databricks-bronze-job",
+        "us-east-1",
+        escalation_time.strftime("%Y-%m-%d %H:%M:%S"),
+        "admin privileges granted unexpectedly to analyst account",
+        "critical",
+        fake.ipv4_public()
+    ])
+
+    # ── Scenario 3: Secret rotation after suspicious activity ─────
+    # Secrets rotated right after the privilege escalation
+    secret_time = escalation_time + timedelta(minutes=3)
+    rows.append([
+        "SECRET000001",
+        "security-admin@datacorp.com",
+        "secret_rotated",
+        "fastapi-backend",
+        "us-east-1",
+        secret_time.strftime("%Y-%m-%d %H:%M:%S"),
+        "emergency secret rotation triggered after privilege escalation",
+        "high",
+        fake.ipv4_public()
+    ])
+
+    # ── Write all rows ────────────────────────────────────────────
     with open(OUTPUT_FILE, mode="w", newline="") as file:
         writer = csv.writer(file)
-
         writer.writerow([
             "admin_event_id",
             "admin_user",
@@ -69,35 +145,9 @@ def generate_admin_events(num_records: int = DEFAULT_NUM_RECORDS):
             "risk_level",
             "source_ip"
         ])
+        writer.writerows(rows)
 
-        for i in range(1, num_records + 1):
-            action = random.choice(ACTIONS)
-
-            risk_level = random.choice(["low", "medium", "high"])
-
-            if action in [
-                "iam_policy_updated",
-                "s3_bucket_policy_updated",
-                "secret_rotated",
-                "permission_added"
-            ]:
-                risk_level = random.choice(["medium", "high", "critical"])
-
-            event_time = start_time + timedelta(seconds=random.randint(0, 30 * 24 * 60 * 60))
-
-            writer.writerow([
-                f"ADM{i:09d}",
-                random.choice(ADMIN_USERS),
-                action,
-                random.choice(TARGET_SERVICES),
-                random.choice(REGIONS),
-                event_time.strftime("%Y-%m-%d %H:%M:%S"),
-                f"{action} performed on production service",
-                risk_level,
-                fake.ipv4_public()
-            ])
-
-    print(f"Generated {num_records} admin events at: {OUTPUT_FILE}")
+    print(f"Generated {len(rows)} admin events at: {OUTPUT_FILE}")
 
 
 if __name__ == "__main__":
