@@ -21,3 +21,9 @@ variable "s3_bucket_name" {
   type        = string
   default     = "opsintel-copilot-angad-0025"
 }
+
+variable "rds_password" {
+  description = "Master password for RDS PostgreSQL instance"
+  type        = string
+  sensitive   = true
+}
