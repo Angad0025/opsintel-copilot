@@ -1,62 +1,100 @@
 # =============================================================
 # OpsIntel Copilot — Bedrock RAG Client
-# Queries Amazon Bedrock Knowledge Base for RAG answers
+# Queries Amazon Bedrock Managed Knowledge Base for RAG answers
 # =============================================================
 
 import boto3
+import json
 import logging
 import time
 
 logger = logging.getLogger(__name__)
 
-# Knowledge Base ID — set after creating the KB in AWS console
-KNOWLEDGE_BASE_ID = "YOUR_KNOWLEDGE_BASE_ID"
-MODEL_ARN = "arn:aws:bedrock:us-east-1::foundation-model/anthropic.claude-3-sonnet-20240229-v1:0"
+KNOWLEDGE_BASE_ID = "ZMTLLFQNTO"
+MODEL_ID = "us.anthropic.claude-sonnet-4-6"
 
 
 def get_bedrock_agent_client():
     return boto3.client("bedrock-agent-runtime", region_name="us-east-1")
 
 
+def get_bedrock_runtime_client():
+    return boto3.client("bedrock-runtime", region_name="us-east-1")
+
+
 def query_knowledge_base(question: str) -> dict:
     """
-    Send a question to Bedrock Knowledge Base.
-    Returns the answer and source citations.
+    Send a question to Bedrock Managed Knowledge Base.
+    Step 1: Retrieve relevant chunks from KB
+    Step 2: Send chunks + question to Claude for answer generation
     """
     start_time = time.time()
 
     try:
-        client = get_bedrock_agent_client()
-        response = client.retrieve_and_generate(
-            input={"text": question},
-            retrieveAndGenerateConfiguration={
-                "type": "KNOWLEDGE_BASE",
-                "knowledgeBaseConfiguration": {
-                    "knowledgeBaseId": KNOWLEDGE_BASE_ID,
-                    "modelArn": MODEL_ARN,
-                    "retrievalConfiguration": {
-                        "vectorSearchConfiguration": {
-                            "numberOfResults": 5
-                        }
-                    }
-                }
-            }
+        # Step 1 — Retrieve relevant context from Managed Knowledge Base
+        agent_client = get_bedrock_agent_client()
+        retrieve_response = agent_client.retrieve(
+            knowledgeBaseId=KNOWLEDGE_BASE_ID,
+            retrievalQuery={"text": question}
         )
 
-        answer = response["output"]["text"]
-        citations = response.get("citations", [])
+        # Extract retrieved chunks and sources
+        results = retrieve_response.get("retrievalResults", [])
+        context_chunks = []
         sources = []
-        for citation in citations:
-            for ref in citation.get("retrievedReferences", []):
-                location = ref.get("location", {})
-                if "s3Location" in location:
-                    sources.append(location["s3Location"].get("uri", ""))
 
+        for result in results:
+            content = result.get("content", {}).get("text", "")
+            if content:
+                context_chunks.append(content)
+            location = result.get("location", {})
+            if "s3Location" in location:
+                sources.append(location["s3Location"].get("uri", ""))
+
+        context = "\n\n---\n\n".join(context_chunks)
+
+        if not context:
+            return {
+                "answer": "I could not find relevant information in the knowledge base for this question.",
+                "sources": [],
+                "response_time_ms": int((time.time() - start_time) * 1000)
+            }
+
+        # Step 2 — Generate answer using Claude with retrieved context
+        runtime_client = get_bedrock_runtime_client()
+
+        prompt = f"""You are an AI investigation copilot for OpsIntel, a data reliability and security platform.
+
+Use the following context from our incident records, correlation data, and security playbooks to answer the question.
+Only use information from the provided context. If the context doesn't contain enough information, say so clearly.
+
+CONTEXT:
+{context}
+
+QUESTION: {question}
+
+Provide a clear, specific answer based on the evidence in the context above."""
+
+        response = runtime_client.invoke_model(
+            modelId=MODEL_ID,
+            body=json.dumps({
+                "anthropic_version": "bedrock-2023-05-31",
+                "max_tokens": 1000,
+                "messages": [
+                    {"role": "user", "content": prompt}
+                ]
+            }),
+            contentType="application/json",
+            accept="application/json"
+        )
+
+        response_body = json.loads(response["body"].read())
+        answer = response_body["content"][0]["text"]
         response_time_ms = int((time.time() - start_time) * 1000)
 
         return {
             "answer": answer,
-            "sources": sources,
+            "sources": list(set(sources)),
             "response_time_ms": response_time_ms
         }
 
