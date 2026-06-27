@@ -9,6 +9,7 @@ from services.api.routes_incidents import router as incidents_router
 from services.api.routes_correlation import router as correlation_router
 from services.api.routes_copilot import router as copilot_router
 from services.api.routes_admin import router as admin_router
+from services.api.routes_timeline import router as timeline_router
 from services.api.rds_client import fetch_data_quality
 
 app = FastAPI(
@@ -30,6 +31,7 @@ app.include_router(incidents_router, tags=["Incidents"])
 app.include_router(correlation_router, tags=["Correlations"])
 app.include_router(copilot_router, tags=["Copilot"])
 app.include_router(admin_router, tags=["Admin"])
+app.include_router(timeline_router, tags=["Timeline"])
 
 
 @app.get("/health")
