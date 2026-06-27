@@ -1,7 +1,7 @@
 import streamlit as st
 import requests
 
-API_BASE = "http://localhost:8000"
+API_BASE = "http://44.221.58.68:8000"
 
 
 def render_copilot_chat():

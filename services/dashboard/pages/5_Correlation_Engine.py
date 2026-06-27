@@ -6,7 +6,7 @@ import streamlit as st
 import requests
 import pandas as pd
 
-API_BASE = "http://localhost:8000"
+API_BASE = "http://44.221.58.68:8000"
 
 st.set_page_config(page_title="Correlation Engine — OpsIntel", page_icon="🔗", layout="wide")
 st.title("🔗 Correlation Engine")
